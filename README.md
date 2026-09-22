@@ -1,105 +1,60 @@
-# Sales Forecasting and Customer Segmentation Dashboard
+# IoT Temperature and Humidity Logger with Email Alerts
 
-An end-to-end analytics project that cleans a real retail dataset, segments customers using RFM analysis and K-Means clustering, forecasts monthly sales, and presents the results in an interactive Tableau dashboard.
+A small IoT project that logs temperature and humidity readings to a Google Sheet, draws a live chart, and sends an email alert when the temperature goes above a set limit.
 
-**Live dashboard:** [View on Tableau Public](https://public.tableau.com/views/SalesForecastingandCustomerSegmentationDashboard/Dashboard1)
+## How it works
+1. The sender (`sender.py`) sends a temperature and humidity reading to the Apps Script web app as a URL request.
+2. The Apps Script (`Code.gs`) adds a new row to the Google Sheet with the time, temperature and humidity.
+3. If the temperature is above the threshold, the script emails a **High temperature alert** to the owner of the script.
+4. A cooldown stops the script from sending more than one alert every 10 minutes.
 
-![Dashboard](images/dashboard.png)
+## Tech used
 
-## Problem Statement
+- Python (`requests`) running in Google Colab, used as the device simulator
+- Google Apps Script (web app)
+- Google Sheets (data log and chart)
+- Gmail (through Apps Script `MailApp`)
 
-A retailer wants to know which customers generate the most revenue, which customers are drifting away, and what sales might look like in the coming months. This project answers those questions using historical transaction data.
+## Files
 
-## Dataset
+| File | What it does |
+| --- | --- |
+| `Code.gs` | Apps Script that receives readings, logs them, and sends alerts |
+| `sender.py` | Python code that sends readings to the web app |
+| `images/` | Screenshots of the Sheet, chart and alert email |
 
-- **Online Retail II** (UCI Machine Learning Repository / Kaggle)
-- Transactions from a UK-based online retailer, December 2009 to December 2011
-- Columns: Invoice, StockCode, Description, Quantity, InvoiceDate, Price, Customer ID, Country
+## Settings
 
-## Tools and Technologies
+These are at the top of `Code.gs`:
 
-- **Python:** pandas, NumPy, scikit-learn, statsmodels, matplotlib
-- **Google Colab** for the notebook
-- **Tableau Public** for the dashboard
-- **Git and GitHub** for version control
+| Setting | Value | Meaning |
+| --- | --- | --- |
+| `THRESHOLD` | `30` | An alert is sent when the temperature is above 30 C |
+| `COOLDOWN_MS` | `10 * 60 * 1000` | At most one alert email every 10 minutes |
 
-## Approach
+## Setup
 
-1. **Data cleaning**
-   - Removed rows with no Customer ID, cancelled orders (invoices starting with "C"), and rows with zero or negative quantity or price
-   - Removed duplicates and converted dates
-   - Created a `TotalPrice` column (Quantity x Price)
+1. **Create a Google Sheet.** In row 1 add the headers `Time`, `Temperature`, `Humidity`.
+2. **Add the script.** In the Sheet, go to **Extensions > Apps Script**. Delete the default code and paste the contents of `Code.gs`. Click **Save**.
+3. **Allow email access.** In the Apps Script editor, choose the `testEmail` function and click **Run**. Accept the permission prompts. You should receive an email titled **Test alert**.
+4. **Deploy the web app.** Click **Deploy > New deployment**, choose the type **Web app**, set **Execute as** to *Me* and **Who has access** to *Anyone*, then click **Deploy**. Copy the web app URL that ends in `/exec`.
+5. **Add your URL to the sender.** Open `sender.py` and replace `PASTE_YOUR_REAL_LINK_HERE` with your own `/exec` URL. Keep this URL private and never commit it to GitHub.
+6. **Run the sender.** Run `sender.py` in Google Colab or on your computer. It should print `OK` for each reading.
+7. **Add a chart.** In the Sheet, select the data, then choose **Insert > Chart** and pick a line chart for temperature and humidity.
 
-2. **RFM analysis**
-   - **Recency:** days since the customer's last purchase
-   - **Frequency:** number of unique orders
-   - **Monetary:** total amount spent
+If you change `Code.gs` later, click **Deploy > Manage deployments > Edit**, choose **New version**, and deploy again. The `/exec` URL stays the same.
 
-3. **Customer segmentation**
-   - Applied a log transform and standard scaling to the RFM values
-   - Used K-Means clustering with 4 clusters
-   - Labelled the clusters as **Champions, Loyal, At Risk, and Lost** by comparing the average RFM values of each cluster
+## Demo
 
-4. **Sales forecasting**
-   - Aggregated revenue by month
-   - Fitted an exponential smoothing model (statsmodels) on the monthly series
-   - Tested it on the last 3 months and forecast the next 6 months
+**Sheet with the temperature and humidity chart**
 
-5. **Dashboard**
-   - Built three views in Tableau Public: customers per segment, revenue per segment, and actual vs forecast sales
+![Sheet and chart](images/chart.png)
 
-## Key Findings
+**High temperature alert email**
 
-| Segment | Customers | Revenue |
-|---|---|---|
-| Champions | 1,196 (about 20%) | 12,834,471 (about 74%) |
-| Loyal | 1,459 | 2,842,867 |
-| At Risk | 1,250 | 1,071,864 |
-| Lost | 1,973 | 625,602 |
-| **Total** | **5,878** | **17,374,804** |
+![Alert email](images/alert-email.png)
 
-- **Champions are about 20% of customers but generate about 74% of total revenue**, so retaining them matters most.
-- **Lost customers are the largest group (1,973) but bring in only about 4% of revenue.**
-- Sales peak every November, which points to holiday-season demand.
-- Forecast accuracy on the 3-month test set: **MAPE = X%** *(replace X with your value)*.
+## Notes
 
-## Forecast
-
-![Forecast](images/forecast.png)
-
-## Limitations
-
-- The dataset covers only about two years, which is too short to learn a reliable yearly seasonal pattern. The forecast may overestimate sales after the November peak.
-- Segments come from unsupervised clustering, so the labels are interpretations of the cluster averages, not ground truth.
-- The data is from a single UK retailer and may not generalise to other businesses.
-
-## Future Improvements
-
-- Try SARIMA or Prophet once more history is available
-- Add product-level analysis and country-level filters
-- Add a churn prediction model for the At Risk segment
-- Automate the pipeline and refresh the dashboard on a schedule
-
-## Project Structure
-
-```
-sales-forecasting-dashboard/
-├── data/                 # cleaned data and model outputs (CSV)
-├── notebooks/            # Google Colab notebook (.ipynb)
-├── images/               # dashboard and forecast screenshots
-├── dashboard/            # dashboard files
-└── README.md
-```
-
-## How to Run
-
-1. Download the **Online Retail II** dataset from Kaggle or UCI.
-2. Open the notebook in `notebooks/` in Google Colab.
-3. Upload the dataset, then run the cells in order. This produces `clean_sales.csv`, `customer_segments.csv`, and `sales_forecast.csv`.
-4. Open the Tableau Public link above, or connect Tableau to the CSV files in `data/`.
-
-## Author
-
-**Pradeeksha N**
-B.Tech, Electronics and Communication Engineering, Karunya Institute of Technology and Sciences
-[LinkedIn](https://www.linkedin.com/) | pradeekshaceeni@gmail.com
+- The `/exec` URL works like a password. Anyone who has it can add rows to your Sheet, so do not share it publicly.
+- Readings with a temperature above 30 C trigger the alert, but only one email is sent every 10 minutes.
